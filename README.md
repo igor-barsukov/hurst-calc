@@ -1,1 +1,1 @@
-# hurst-
+# hurst-calc
