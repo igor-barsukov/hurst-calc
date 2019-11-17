@@ -18,7 +18,7 @@ from os import path
 
 def run(pcapfile):
     # открываем файл с данными
-    infile  = open(pcapfile,'rb')
+    infile  = open(pcapfile,'rb') # opens file for reading only in binary format! 
     # открываем для записи файл для сохранения статистики
     # получаем имя 1-ого файла без расширения и добавляем .csv
     outfileName = path.splitext(path.basename(pcapfile))[0]+'_tps.csv'

@@ -1,32 +1,52 @@
 import argparse
 from basic_rs import basic_rs
-from basic_rs.parse import parse1_tps
+from basic_rs.parse import parse_tps
 
 def main():
     # log_file = open("logger.log","w")
     # sys.stdout = log_file
     parser = argparse.ArgumentParser(description = 'Test argparse')
 
-    parser.add_argument("--mode", choices=["stat", "pcap"],
-                        required=True, type=str, help="Processing mode")
-    parser.add_argument("--file", type=str, help="Stat file name")
-    parser.add_argument("--pcapfile", type=str, help="Pcap file name")
+    subparsers = parser.add_subparsers(help='Choose mode', dest='mode')
+    # Stat file mode
+    stat_parser = subparsers.add_parser("stat", help="Process stat file")
+    stat_parser.add_argument("--file", type=str, help="Stat file name")
+    # Pcap mode
+    pcap_parser = subparsers.add_parser("pcap", help="Process pcap file")
+    pcap_parser.add_argument("--pcapfile", type=str, help="Pcap file name")
+    pcap_parser.add_argument("--parsemode",
+                            choices=["tps", "tps-tcp", "tps-tcp-decisec", "tbp", "ncps"],
+                            required=True, type=str, help="Parsing mode")
 
     args = parser.parse_args()
-    mode = args.mode
-    file = args.file
-    pcapfile = args.pcapfile
-
-    if mode == "stat":
+    if args.mode == "stat":
+        file = args.file
         print('Processing stat file - ', file)
         basic_rs.run(file)
-    elif mode == "pcap":
+    elif args.mode == "pcap":
+        pcapfile = args.pcapfile
+        parsemode = args.parsemode
         print('Processing pcap file - ', pcapfile)
-        file = parse1_tps.run(pcapfile)
+        print('Parse mode - ', parsemode)
+
+        if parsemode == "tps":
+            file = parse_tps.run(pcapfile)
+        elif parsemode == "tps-tcp":
+            file = parse_tps-tcp.run(pcapfile)
+        elif parsemode == "tps-tcp-decisec":
+            file = parse_tps-tcp-decisec.run(pcapfile)
+        elif parsemode == "tbp":
+            file = parse_tbp.run(pcapfile)
+        elif parsemode == "ncps":
+            file = parse_ncps.run(pcapfile)
+        else:
+            file = parse_tps.run(pcapfile) # default mode
+
         print('Generated file - ', file)
         basic_rs.run(file)
     else:
         print('Undefined mode')
+
     # log_file.close()
 
 if __name__ == '__main__':
