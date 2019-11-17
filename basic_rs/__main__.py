@@ -2,6 +2,13 @@ import argparse
 from basic_rs import basic_rs
 from basic_rs.parse import parse_tps
 
+"""
+Usage:
+
+python -m basic_rs stat --file=merged-2017-11-27-10-02_tps.csv
+python -m basic_rs pcap --pcapfile=normal_traffic_5min --parsemode=tps
+"""
+
 def main():
     # log_file = open("logger.log","w")
     # sys.stdout = log_file
