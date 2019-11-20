@@ -12,6 +12,7 @@ dmin = 50
 
 def run(file):
     with open(file, 'r') as f:
+        ## TODO: add processing of float numbers for tbp case -> ValueError: invalid literal for int() with base 10: '0.022845983505249023'
         M0 = [int(line.strip()) for line in f]  # removes new line char ('\n') with strip and converts strings to int values
         L0 = len(M0)
         print('len M0 = ', L0)

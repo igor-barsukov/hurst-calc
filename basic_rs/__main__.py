@@ -1,6 +1,10 @@
 import argparse
 from basic_rs import basic_rs
 from basic_rs.parse import parse_tps
+from basic_rs.parse import parse_tps_tcp
+from basic_rs.parse import parse_tps_tcp_decisec
+from basic_rs.parse import parse_tbp
+from basic_rs.parse import parse_ncps
 
 """
 Usage:
@@ -39,9 +43,9 @@ def main():
         if parsemode == "tps":
             file = parse_tps.run(pcapfile)
         elif parsemode == "tps-tcp":
-            file = parse_tps-tcp.run(pcapfile)
+            file = parse_tps_tcp.run(pcapfile)
         elif parsemode == "tps-tcp-decisec":
-            file = parse_tps-tcp-decisec.run(pcapfile)
+            file = parse_tps_tcp_decisec.run(pcapfile)
         elif parsemode == "tbp":
             file = parse_tbp.run(pcapfile)
         elif parsemode == "ncps":
