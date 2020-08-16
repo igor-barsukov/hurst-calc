@@ -6,7 +6,10 @@
 import math
 import numpy
 import sys
+import logging
+import os
 
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 numpy.set_printoptions(threshold=sys.maxsize)  #to print full NumPy arrays, without truncation
 dmin = 50
 
@@ -15,12 +18,12 @@ def run(file):
         ## TODO: add processing of float numbers for tbp case -> ValueError: invalid literal for int() with base 10: '0.022845983505249023'
         M0 = [int(line.strip()) for line in f]  # removes new line char ('\n') with strip and converts strings to int values
         L0 = len(M0)
-        print('len M0 = ', L0)
+        logging.debug('len M0 = %s', L0)
         OptN = periods(L0)
         D = divisors(OptN, dmin)
 
         M = M0[0:OptN]
-        print('len M = ', len(M))
+        logging.debug('len M = %s', len(M))
         L = len(D)
         RSn = []
         for i in range(0, L):
@@ -51,26 +54,27 @@ def run(file):
             R = numpy.amax(cumsum, axis=0) - numpy.amin(cumsum, axis=0)  #array subtract array
             RS = numpy.divide(R, S)  #array divides array
             RSn.append(numpy.mean(RS))
-        print('D = ', D)
-        print('RSn = ', RSn)
+        logging.debug('D = %s', D)
+        logging.debug('RSn = %s', RSn)
         logD = numpy.log10(D)
         logRSn = numpy.log10(RSn)
         P = numpy.polyfit(logD, logRSn, 1)
-        print('P - ', P)
+        logging.debug('P - %s', P)
         H = P[0]
-        print('H - ', H)
+        print('H = ', H)
 
 def periods(L):
     L0 = math.floor(0.99*L)
     dv = []
     for i in range(L0, L):
         dv.append(len(divisors(i, dmin)))
-    print('dv: ', *dv)
+    # print('dv: ', *dv)
+    logging.debug('dv: %s', dv)
     maximum = max(dv)
     # print('max = ', maximum)
     # print('index = ', dv.index(maximum))
     OptN = L0 + dv.index(maximum) #remove '-1' because of indexes in python starting from 0
-    print('OptN = ', OptN)
+    logging.debug('OptN = %s', OptN)
     return OptN
 
 

@@ -1,4 +1,5 @@
 import argparse
+import os
 from basic_rs import basic_rs
 from basic_rs.parse import parse_tps
 from basic_rs.parse import parse_tps_tcp
@@ -7,9 +8,10 @@ from basic_rs.parse import parse_tbp
 from basic_rs.parse import parse_ncps
 
 """
-Usage:
+Usage examples:
 
 python -m basic_rs stat --file=merged-2017-11-27-10-02_tps.csv
+python -m basic_rs stat --dir=D:/Aspirantura/nsl-kdd-hurst-calc
 python -m basic_rs pcap --pcapfile=normal_traffic_5min --parsemode=tps
 """
 
@@ -22,6 +24,7 @@ def main():
     # Stat file mode
     stat_parser = subparsers.add_parser("stat", help="Process stat file")
     stat_parser.add_argument("--file", type=str, help="Stat file name")
+    stat_parser.add_argument("--dir", type=str, help="Directory containing stat files")
     # Pcap mode
     pcap_parser = subparsers.add_parser("pcap", help="Process pcap file")
     pcap_parser.add_argument("--pcapfile", type=str, help="Pcap file name")
@@ -31,9 +34,15 @@ def main():
 
     args = parser.parse_args()
     if args.mode == "stat":
-        file = args.file
-        print('Processing stat file - ', file)
-        basic_rs.run(file)
+        if args.file is not None:
+            print('Processing stat file - ', args.file)
+            basic_rs.run(args.file)
+        elif args.dir is not None:
+            print('Processing dir with stat files - ', args.dir)
+            for file in os.listdir(args.dir):
+                if file.endswith(".csv"):
+                    print("Processing file - ", file)
+                    basic_rs.run(file)
     elif args.mode == "pcap":
         pcapfile = args.pcapfile
         parsemode = args.parsemode
