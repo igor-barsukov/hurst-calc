@@ -1,6 +1,8 @@
 import dpkt
 import socket
 
+infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
+
 def get_duration(pcap):
     print('get_duration')
     tcp_session_keys = set()
@@ -42,12 +44,7 @@ def get_tcp_connections(pcap):
         eth = dpkt.ethernet.Ethernet(buf)
         tcp_response = detect_tcp(eth)
         if(tcp_response is not None):
-            tcp = tcp_response[0]
-            s_ip = tcp_response[1]
-            d_ip = tcp_response[2]
-            s_port = tcp.sport
-            d_port = tcp.dport
-            key =  s_ip + '_' + d_ip + '_' + str(s_port) + '_' + str(d_port)
+            key = generate_tcp_connection_key(tcp_response)
             if (key not in syn_fin_packets):
                 syn_fin_packets[key] = ts
             tcp_session_keys.add(key)
@@ -55,6 +52,15 @@ def get_tcp_connections(pcap):
         for k, v in syn_fin_packets.items():
             f.write(str(k) + ' >>> '+ str(v) + '\n')
     return syn_fin_packets
+
+def generate_tcp_connection_key(tcp_resp):
+    tcp = tcp_resp[0]
+    s_ip = tcp_resp[1]
+    d_ip = tcp_resp[2]
+    s_port = tcp.sport
+    d_port = tcp.dport
+    key =  s_ip + '_' + d_ip + '_' + str(s_port) + '_' + str(d_port)
+    return key
 
 def get_duration1(pcap):
     # идея - не проверять флаги, а просто сканировать для каждого соединения, находить 1й и последний и по разнице ts выводить duration
@@ -126,8 +132,49 @@ def get_service(pcap):
 def get_flag(pcap):
     print('get_flag')
 
+# сейчас считывает полное число байт в обе стороны, совпадает с полем Bytes в шарке
 def get_src_bytes(pcap):
     print('get_src_bytes')
+    syn_fin_packets = get_tcp_connections(pcap)
+    conn_bytes_dict = {}
+    print('syn_fin_packets size - ', len(syn_fin_packets))
+    for key in syn_fin_packets.keys():
+        infile.seek(0)  # to reset cursor and read file again
+        pcap = dpkt.pcap.Reader(infile)
+        for ts, buf in pcap:
+            eth = dpkt.ethernet.Ethernet(buf)
+            tcp_response = detect_tcp(eth)
+            if(tcp_response is not None):
+                scanned_key = generate_tcp_connection_key(tcp_response)
+                if (scanned_key == key):
+                    if (key not in conn_bytes_dict):
+                        conn_bytes_dict[scanned_key] = len(buf)
+                    else:
+                        bytes_count = conn_bytes_dict[scanned_key]
+                        bytes_count = bytes_count + len(buf)
+                        conn_bytes_dict[scanned_key] = bytes_count
+    print('conn_bytes_dict size - ', len(conn_bytes_dict))
+    # with open('get_src_bytes.txt',mode='w') as f:
+    #     for k, v in conn_bytes_dict.items():
+    #         f.write(str(k) + ' >>> ' + str(v) + '\n')
+
+def get_src_bytes1(pcap):
+    conn_bytes_dict = {}
+    for ts, buf in pcap:
+        eth = dpkt.ethernet.Ethernet(buf)
+        tcp_response = detect_tcp(eth)
+        if(tcp_response is not None):
+            key = generate_tcp_connection_key(tcp_response)
+            if (key not in conn_bytes_dict):
+                conn_bytes_dict[key] = len(buf)
+            else:
+                bytes_count = conn_bytes_dict[key]
+                bytes_count = bytes_count + len(buf)
+                conn_bytes_dict[key] = bytes_count
+    print('conn_bytes_dict size - ', len(conn_bytes_dict))
+    with open('get_src_bytes1.txt',mode='w') as f:
+        for k, v in conn_bytes_dict.items():
+            f.write(str(k) + ' >>> ' + str(v) + '\n')
 
 def get_dst_bytes(pcap):
     print('get_dst_bytes')
@@ -154,9 +201,10 @@ def inet_to_str(inet):
         return socket.inet_ntop(socket.AF_INET6, inet)
 
 def main():
-    infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
+    # infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
     pcap = dpkt.pcap.Reader(infile)
-    get_duration1(pcap)
+    # get_duration1(pcap)
+    get_src_bytes1(pcap)
 
 if __name__ == '__main__':
     main()
