@@ -1,7 +1,8 @@
 import dpkt
 import socket
 
-infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
+# infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-06.%H.%M.%S.pcap', 'rb')
+infile = open('C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
 
 def get_duration(pcap):
     print('get_duration')
@@ -62,17 +63,17 @@ def generate_tcp_connection_key(tcp_resp):
     key =  s_ip + '_' + d_ip + '_' + str(s_port) + '_' + str(d_port)
     return key
 
+# obsolete
 def get_duration1(pcap):
     # идея - не проверять флаги, а просто сканировать для каждого соединения, находить 1й и последний и по разнице ts выводить duration
     print('get_duration')
-    print('pcap1 - ', dir(pcap))
     syn_fin_packets = get_tcp_connections(pcap)
     print('syn_fin_packets size - ', len(syn_fin_packets))
 
-    infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
-    pcap1 = dpkt.pcap.Reader(infile)
+    infile.seek(0)  # to reset cursor and read file again
+    pcap = dpkt.pcap.Reader(infile)             
     syn_fin_packets_2 = {}
-    for ts, buf in pcap1:
+    for ts, buf in pcap:
         # print('here1 - ', len(buf))
         eth = dpkt.ethernet.Ethernet(buf)
         tcp_response = detect_tcp(eth)
@@ -123,7 +124,40 @@ def get_duration1(pcap):
         for k, v in syn_fin_packets_2.items():
             f.write(str(k) + ' >>> '+ str(v) + '\n')
 
+def get_duration2(pcap):
+    print('get_duration2')
+    conn_durations_dict = {}
+    for ts, buf in pcap:
+        eth = dpkt.ethernet.Ethernet(buf)
+        tcp_response = detect_tcp(eth)
+        if(tcp_response is not None):
+            key = generate_tcp_connection_key(tcp_response)
+            if(key not in conn_durations_dict):
+                conn_durations_dict[key] = [ts] # set ts of first packet of this connection at 1st position of list
+            elif(conn_durations_dict[key] is not None and len(conn_durations_dict[key]) == 1):
+                # set ts of second packet of this connection at 2nd position of list
+                ts_list = conn_durations_dict[key]
+                ts_list.append(ts)
+                conn_durations_dict[key] = ts_list 
+            elif(conn_durations_dict[key] is not None and len(conn_durations_dict[key]) == 2):
+                conn_durations_dict[key][1] = ts # reset ts of each next packet of this connection on 2nd position of list
+    print("conn_durations_dict size - ", len(conn_durations_dict))
+    with open('get_duration2_temp.txt',mode='w') as f:
+        for k, v in conn_durations_dict.items():
+            f.write(str(k) + ' >>> ' + str(v) + '\n')
+    conn_durations_new_dict = {}
+    for k, v in conn_durations_dict.items():
+        if(len(v) > 1):
+            conn_durations_new_dict[k] = v[1] - v[0]
+        else:
+            conn_durations_new_dict[k] = 0.0  # in case if only one packet for connection is present
+    print("conn_durations_new_dict size - ", len(conn_durations_new_dict))
+    with open('get_duration2.txt',mode='w') as f:
+        for k, v in conn_durations_new_dict.items():
+            f.write(str(k) + ' >>> ' + str(v) + '\n')
+
 def get_protocol(pcap):
+    # icmp, tcp, udp
     print('get_protocol')
 
 def get_service(pcap):
@@ -133,6 +167,9 @@ def get_flag(pcap):
     print('get_flag')
 
 # сейчас считывает полное число байт в обе стороны, совпадает с полем Bytes в шарке
+# как определить кол-во байт в разные стороны? по флагам?
+# syn(1),ack(0) - от клиента, syn(1),ack(1) - от сервера, syn(0),ack(1) - от клиента 
+# ("All packets after the initial SYN packet sent by the client should have ACK flag set.")
 def get_src_bytes(pcap):
     print('get_src_bytes')
     syn_fin_packets = get_tcp_connections(pcap)
@@ -201,10 +238,10 @@ def inet_to_str(inet):
         return socket.inet_ntop(socket.AF_INET6, inet)
 
 def main():
-    # infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
     pcap = dpkt.pcap.Reader(infile)
     # get_duration1(pcap)
-    get_src_bytes1(pcap)
+    # get_src_bytes1(pcap)
+    get_duration2(pcap)
 
 if __name__ == '__main__':
     main()
