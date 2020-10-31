@@ -63,6 +63,9 @@ def generate_tcp_connection_key(tcp_resp):
     key =  s_ip + '_' + d_ip + '_' + str(s_port) + '_' + str(d_port)
     return key
 
+# def get_flags_for_connection(tcp_resp):
+#     conn_key = generate_tcp_connection_key(tcp_resp)
+
 # obsolete
 def get_duration1(pcap):
     # идея - не проверять флаги, а просто сканировать для каждого соединения, находить 1й и последний и по разнице ts выводить duration
@@ -71,7 +74,7 @@ def get_duration1(pcap):
     print('syn_fin_packets size - ', len(syn_fin_packets))
 
     infile.seek(0)  # to reset cursor and read file again
-    pcap = dpkt.pcap.Reader(infile)             
+    pcap = dpkt.pcap.Reader(infile)
     syn_fin_packets_2 = {}
     for ts, buf in pcap:
         # print('here1 - ', len(buf))
@@ -138,7 +141,7 @@ def get_duration2(pcap):
                 # set ts of second packet of this connection at 2nd position of list
                 ts_list = conn_durations_dict[key]
                 ts_list.append(ts)
-                conn_durations_dict[key] = ts_list 
+                conn_durations_dict[key] = ts_list
             elif(conn_durations_dict[key] is not None and len(conn_durations_dict[key]) == 2):
                 conn_durations_dict[key][1] = ts # reset ts of each next packet of this connection on 2nd position of list
     print("conn_durations_dict size - ", len(conn_durations_dict))
@@ -164,11 +167,52 @@ def get_service(pcap):
     print('get_service')
 
 def get_flag(pcap):
+    '''
+    11 флагов
+    SF - normal establishment and termination.
+    REJ - connection attempt rejected
+    S0 - connection attempt seen, no reply
+    S1 - connection established, not terminated
+    S2 - connection established and close attempt by originator seen (but no reply from responder)
+    S3 - connection established and close attempt by responder seen (but no reply from originator)
+    RSTO - connection reset by originator
+    RSTR - connection reset by responder
+    OTH - no SYN seen, just midstream traffic (partial connection that was not later closed)
+    RSTOS0 - originator sent SYN followed by RST, we never saw SYN-ACK from responder
+    SH - originator sent SYN followed by FIN, we never saw SYN-ACK from responder (connection was half open)
+    '''
     print('get_flag')
+    conn_flags_dict = {}
+    for ts, buf in pcap:
+        eth = dpkt.ethernet.Ethernet(buf)
+        tcp_response = detect_tcp(eth)
+        if(tcp_response is not None):
+            key = generate_tcp_connection_key(tcp_response)
+            tcp = tcp_response[0]
+            fin_flag = ( tcp.flags & dpkt.tcp.TH_FIN ) != 0
+            syn_flag = ( tcp.flags & dpkt.tcp.TH_SYN ) != 0
+            rst_flag = ( tcp.flags & dpkt.tcp.TH_RST ) != 0
+            psh_flag = ( tcp.flags & dpkt.tcp.TH_PUSH) != 0
+            ack_flag = ( tcp.flags & dpkt.tcp.TH_ACK ) != 0
+            urg_flag = ( tcp.flags & dpkt.tcp.TH_URG ) != 0
+            ece_flag = ( tcp.flags & dpkt.tcp.TH_ECE ) != 0
+            cwr_flag = ( tcp.flags & dpkt.tcp.TH_CWR ) != 0
+
+            if syn_flag and not ack_flag:
+                pass
+            elif syn_flag and ack_flag:
+                pass
+            elif not syn_flag and ack_flag:
+                pass
+            elif fin_flag:
+                pass
+            elif rst_flag:
+                pass
+    pass
 
 # сейчас считывает полное число байт в обе стороны, совпадает с полем Bytes в шарке
 # как определить кол-во байт в разные стороны? по флагам?
-# syn(1),ack(0) - от клиента, syn(1),ack(1) - от сервера, syn(0),ack(1) - от клиента 
+# syn(1),ack(0) - от клиента, syn(1),ack(1) - от сервера, syn(0),ack(1) - от клиента
 # ("All packets after the initial SYN packet sent by the client should have ACK flag set.")
 def get_src_bytes(pcap):
     print('get_src_bytes')
