@@ -1,8 +1,8 @@
 import dpkt
 import socket
 
-# infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-06.%H.%M.%S.pcap', 'rb')
-infile = open('C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
+infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
+# infile = open('C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
 
 def get_duration(pcap):
     print('get_duration')
@@ -180,6 +180,19 @@ def get_flag(pcap):
     OTH - no SYN seen, just midstream traffic (partial connection that was not later closed)
     RSTOS0 - originator sent SYN followed by RST, we never saw SYN-ACK from responder
     SH - originator sent SYN followed by FIN, we never saw SYN-ACK from responder (connection was half open)
+
+    Connection establishing (3-way handshake):
+    client -- server
+    SYN ->
+          <- SYN-ACK
+    ACK ->
+
+    Connection termination (4-way handshake):
+    client -- server
+    FIN ->
+          <- ACK
+          <- FIN
+    ACK ->
     '''
     print('get_flag')
     conn_flags_dict = {}
@@ -198,17 +211,46 @@ def get_flag(pcap):
             ece_flag = ( tcp.flags & dpkt.tcp.TH_ECE ) != 0
             cwr_flag = ( tcp.flags & dpkt.tcp.TH_CWR ) != 0
 
+            flags = (
+            ( "C" if cwr_flag else " " ) +
+            ( "E" if ece_flag else " " ) +
+            ( "U" if urg_flag else " " ) +
+            ( "A" if ack_flag else " " ) +
+            ( "P" if psh_flag else " " ) +
+            ( "R" if rst_flag else " " ) +
+            ( "S" if syn_flag else " " ) +
+            ( "F" if fin_flag else " " ) )
+
+            insert_or_update_dict(conn_flags_dict, key, flags + " " + str(ts))
+
             if syn_flag and not ack_flag:
+                # connection establishing 1 - client send SYN to server ->
                 pass
             elif syn_flag and ack_flag:
+                # connection establishing 2 - server send SYN-ACK to client <-
                 pass
             elif not syn_flag and ack_flag:
+                # connection establishing 3 - client send ACK to server ->
+                # or it may be connecting terminating phase - either ACK from server to client or final ACK from client to server
                 pass
             elif fin_flag:
+                # connection terminating - either begining FIN from client to server or FIN from server to client
                 pass
             elif rst_flag:
+                # connection refused - server sends RST to client's 1st SYN
                 pass
-    pass
+    print("conn_flags_dict size - ", len(conn_flags_dict))
+    with open('get_flags.txt',mode='w') as f:
+        for k, v in conn_flags_dict.items():
+            f.write(str(k) + ' >>> ' + str(v) + '\n')
+
+def insert_or_update_dict(conn_dict, key, val):
+    if key not in conn_dict.keys():
+        conn_dict[key] = [val]
+    else:
+        val_list = conn_dict[key]
+        val_list.append(val)
+        conn_dict[key] = val_list
 
 # сейчас считывает полное число байт в обе стороны, совпадает с полем Bytes в шарке
 # как определить кол-во байт в разные стороны? по флагам?
@@ -285,7 +327,8 @@ def main():
     pcap = dpkt.pcap.Reader(infile)
     # get_duration1(pcap)
     # get_src_bytes1(pcap)
-    get_duration2(pcap)
+    # get_duration2(pcap)
+    get_flag(pcap)
 
 if __name__ == '__main__':
     main()
