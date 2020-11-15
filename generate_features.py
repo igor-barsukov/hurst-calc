@@ -1,8 +1,8 @@
 import dpkt
 import socket
 
-infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
-# infile = open('C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
+# infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
+infile = open('C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
 
 def get_duration(pcap):
     print('get_duration')
@@ -221,36 +221,70 @@ def get_flag(pcap):
             ( "S" if syn_flag else " " ) +
             ( "F" if fin_flag else " " ) )
 
-            insert_or_update_dict(conn_flags_dict, key, flags + " " + str(ts))
+            insert_or_update_dict(conn_flags_dict, key, flags + " " + str(ts), list_val = True)
 
             if syn_flag and not ack_flag:
                 # connection establishing 1 - client send SYN to server ->
+                # S0 flag?
                 pass
             elif syn_flag and ack_flag:
                 # connection establishing 2 - server send SYN-ACK to client <-
+                # 
                 pass
             elif not syn_flag and ack_flag:
                 # connection establishing 3 - client send ACK to server ->
                 # or it may be connecting terminating phase - either ACK from server to client or final ACK from client to server
+                # S1 flag?
                 pass
             elif fin_flag:
                 # connection terminating - either begining FIN from client to server or FIN from server to client
+                # SF flag?
                 pass
-            elif rst_flag:
+            elif ack_flag and rst_flag:
+                # indicates that port is closed
+                pass
+            elif rst_flag and not rst_flag:
                 # connection refused - server sends RST to client's 1st SYN
+                # in other words - receiver sends RST to the sender when a packet is sent to a particular host that was not expecting it.
+                # REJ flag?
+                pass
+            elif urg_flag:
                 pass
     print("conn_flags_dict size - ", len(conn_flags_dict))
     with open('get_flags.txt',mode='w') as f:
         for k, v in conn_flags_dict.items():
             f.write(str(k) + ' >>> ' + str(v) + '\n')
 
-def insert_or_update_dict(conn_dict, key, val):
+def get_urgents(pcap):
+    print('get_urgents')
+    conn_urgents_dict = {}
+    for ts, buf in pcap:
+        eth = dpkt.ethernet.Ethernet(buf)
+        tcp_response = detect_tcp(eth)
+        if(tcp_response is not None):
+            key = generate_tcp_connection_key(tcp_response)
+            tcp = tcp_response[0]
+            urg_flag = ( tcp.flags & dpkt.tcp.TH_URG ) != 0
+            if urg_flag:
+                insert_or_update_dict(conn_urgents_dict, key, 1, increment = True)
+            else:
+                insert_or_update_dict(conn_urgents_dict, key, 0, increment = True)
+    print("conn_urgents_dict size - ", len(conn_urgents_dict))
+    with open('get_urgents.txt',mode='w') as f:
+        for k, v in conn_urgents_dict.items():
+            f.write(str(k) + ' >>> ' + str(v) + '\n')
+
+
+def insert_or_update_dict(conn_dict, key, val, increment = False, list_val = False):
     if key not in conn_dict.keys():
         conn_dict[key] = [val]
     else:
-        val_list = conn_dict[key]
-        val_list.append(val)
-        conn_dict[key] = val_list
+        fetched_val = conn_dict[key]
+        if type(fetched_val) == list and not increment:
+            fetched_val.append(val)
+        elif type(fetched_val) == int and val > 0 and increment:
+            fetched_val += 1    
+        conn_dict[key] = fetched_val
 
 # сейчас считывает полное число байт в обе стороны, совпадает с полем Bytes в шарке
 # как определить кол-во байт в разные стороны? по флагам?
@@ -328,7 +362,8 @@ def main():
     # get_duration1(pcap)
     # get_src_bytes1(pcap)
     # get_duration2(pcap)
-    get_flag(pcap)
+    # get_flag(pcap)
+    get_urgents(pcap)
 
 if __name__ == '__main__':
     main()
