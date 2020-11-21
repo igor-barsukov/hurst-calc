@@ -2,7 +2,29 @@ import dpkt
 import socket
 
 # infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
-infile = open('C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
+infile = open('C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\2020-11-16-22-11.pcap\\testfile.2020-11-16.%H.%M.%S.pcap', 'rb')
+
+class Connection:
+    
+    def __init__(self, a_addr, a_port, b_addr, b_port):
+        self.a_addr = a_addr
+        self.a_port = a_port
+        self.b_addr = b_addr
+        self.b_port = b_port
+        self.a_bytes = 0
+        self.b_bytes = 0
+        self.key = a_addr + '_' + str(a_port) + '_' + b_addr + '_' + str(b_port)
+        self.reversed_key = b_addr + '_' + str(b_port) + '_' + a_addr + '_' + str(a_port)
+
+    def setABytes(self, bytes):
+        self.a_bytes += bytes
+
+    def setBBytes(self, bytes):
+        self.b_bytes += bytes
+
+    def __str__(self):
+        return f'Connection: A host - {self.a_addr}:{self.a_port} with {self.a_bytes} bytes, B host - {self.b_addr}:{self.b_port} with {self.b_bytes} bytes'
+     
 
 def get_duration(pcap):
     print('get_duration')
@@ -63,8 +85,14 @@ def generate_tcp_connection_key(tcp_resp):
     key =  s_ip + '_' + d_ip + '_' + str(s_port) + '_' + str(d_port)
     return key
 
-# def get_flags_for_connection(tcp_resp):
-#     conn_key = generate_tcp_connection_key(tcp_resp)
+def generate_tcp_connection_obj(tcp_resp):
+    tcp = tcp_resp[0]
+    s_ip = tcp_resp[1]
+    d_ip = tcp_resp[2]
+    s_port = tcp.sport
+    d_port = tcp.dport
+    conn = Connection(a_addr=s_ip, a_port=s_port, b_addr=d_ip, b_port=d_port)
+    return conn
 
 # obsolete
 def get_duration1(pcap):
@@ -221,7 +249,7 @@ def get_flag(pcap):
             ( "S" if syn_flag else " " ) +
             ( "F" if fin_flag else " " ) )
 
-            insert_or_update_dict(conn_flags_dict, key, flags + " " + str(ts), list_val = True)
+            insert_or_update_dict(conn_flags_dict, key, flags + " ", list_val = True)
 
             if syn_flag and not ack_flag:
                 # connection establishing 1 - client send SYN to server ->
@@ -243,7 +271,7 @@ def get_flag(pcap):
             elif ack_flag and rst_flag:
                 # indicates that port is closed
                 pass
-            elif rst_flag and not rst_flag:
+            elif rst_flag and not ack_flag:
                 # connection refused - server sends RST to client's 1st SYN
                 # in other words - receiver sends RST to the sender when a packet is sent to a particular host that was not expecting it.
                 # REJ flag?
@@ -333,6 +361,39 @@ def get_src_bytes1(pcap):
         for k, v in conn_bytes_dict.items():
             f.write(str(k) + ' >>> ' + str(v) + '\n')
 
+
+'''
+Потенциальная проблема - в некоторых соединения порт А - 443, а порт Б - 5знач порт, например
+62.76.174.7:443 with 27620 bytes, B host - 62.76.169.30:37202 with 198 bytes
+Тогда как в Wireshark это соединение задано наоборот (443 - во всех случаях это порт Б).
+При этом такое же поведение в get_src_bytes1
+В остальном разбиение соединения на потоки А->Б (src->dst) и Б->А (dst->src) корректно.
+Переименовать этот метод.
+'''
+def get_src_bytes2(pcap):
+    conn_bytes_dict = {}
+    for ts, buf in pcap:
+        eth = dpkt.ethernet.Ethernet(buf)
+        tcp_response = detect_tcp(eth)
+        if(tcp_response is not None):
+            conn = generate_tcp_connection_obj(tcp_response)
+            if (conn.key in conn_bytes_dict):
+                stored_conn = conn_bytes_dict[conn.key]
+                stored_conn.setABytes(len(buf))
+                conn_bytes_dict[conn.key] = stored_conn
+            elif (conn.reversed_key in conn_bytes_dict):
+                stored_conn = conn_bytes_dict[conn.reversed_key]
+                stored_conn.setBBytes(len(buf))
+                conn_bytes_dict[conn.reversed_key] = stored_conn
+            else:
+                conn.setABytes(len(buf))
+                conn_bytes_dict[conn.key] = conn
+    print('conn_bytes_dict size - ', len(conn_bytes_dict))
+    with open('get_src_bytes2.txt',mode='w') as f:
+        for k, v in conn_bytes_dict.items():
+            f.write(str(v) + '\n')
+
+
 def get_dst_bytes(pcap):
     print('get_dst_bytes')
 
@@ -363,7 +424,8 @@ def main():
     # get_src_bytes1(pcap)
     # get_duration2(pcap)
     # get_flag(pcap)
-    get_urgents(pcap)
+    # get_urgents(pcap)
+    get_src_bytes2(pcap)
 
 if __name__ == '__main__':
     main()
