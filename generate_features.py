@@ -318,33 +318,43 @@ def analyze_flags(conn_flags_dict):
     conn_final_flags_dict = {}
     for key, conn in conn_flags_dict.items():
         if all(x in conn.a_flags for x in ['S','A','AF']) and all(x in conn.b_flags for x in ['AS','A','AF']):
+            # normal establishment and termination -> all est. flags (SYN, SYN-ACK, ACK) + all term. flags (FIN, FIN-ACK, ACK)
             conn_final_flags_dict[key] = 'SF'
-        elif ('S' in conn.a_flags) and ('AS' in conn.b_flags) and ('R' in conn.a_flags):
-            conn_final_flags_dict[key] = 'REJ' # possibly wrong conditions
-        elif ('S' in conn.a_flags) and ('AS' not in conn.b_flags):
+        elif (len(conn.a_flags) == 2) and (len(conn.b_flags) == 1) and (conn.a_flags[0] == 'S') and (conn.b_flags[0] == 'AS') and (conn.a_flags[1] == 'R'):
+            # connection attempt rejected -> est. flags SYN, SYN-ACK + RST (from client)
+            conn_final_flags_dict[key] = 'REJ'
+        elif ('S' in conn.a_flags) and (len(conn.a_flags) == 1) and ('AS' not in conn.b_flags):
+            # connection attempt seen, no reply -> SYN only
             conn_final_flags_dict[key] = 'S0'
-        elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('AF' not in conn.a_flags) and ('AF' not in conn.b_flags):
+        elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and all(x not in conn.a_flags for x in ['F','AF','R','AR']) and all(x not in conn.b_flags for x in ['F','AF','R','AR']):
+            # connection established, not terminated -> all est. flags (SYN, SYN-ACK, ACK) 
             conn_final_flags_dict[key] = 'S1'
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('AF' in conn.a_flags) and ('AF' not in conn.b_flags):
+            # connection established and close attempt by originator seen (but no reply from responder) -> all est. flags (SYN, SYN-ACK, ACK) + FIN from originator
             conn_final_flags_dict[key] = 'S2'
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('AF' not in conn.a_flags) and ('AF' in conn.b_flags):
+            # connection established and close attempt by responder seen (but no reply from originator) -> all est. flags (SYN, SYN-ACK, ACK) + FIN from responder
             conn_final_flags_dict[key] = 'S3'
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('R' in conn.a_flags) and ('R' not in conn.b_flags):
+            # connection reset by originator -> all est. flags (SYN, SYN-ACK, ACK) + RST from originator
             conn_final_flags_dict[key] = 'RSTO' # possibly wrong conditions
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('R' not in conn.a_flags) and ('R' in conn.b_flags):
+            # connection reset by responder -> all est. flags (SYN, SYN-ACK, ACK) + RST from responder
             conn_final_flags_dict[key] = 'RSTR' # possibly wrong conditions
         elif all(x not in conn.a_flags for x in ['S','AF']) and all(x not in conn.b_flags for x in ['AS','AF']):
+            # no SYN seen, just midstream traffic (partial connection that was not later closed) -> no est. related flags + no term. related flags
             conn_final_flags_dict[key] = 'OTH'
-        elif all(x in conn.a_flags for x in ['S','R']) and ('AS' not in conn.b_flags):
-            conn_final_flags_dict[key] = 'RSTOS0' # possibly wrong conditions
-        elif False:
-            # 'SH'
-            pass
+        elif all(x in conn.a_flags for x in ['S','R']) and (len(conn.a_flags) == 2) and ('AS' not in conn.b_flags):
+            # originator sent SYN followed by RST, we never saw SYN-ACK from responder -> est. flag SYN + RST (from client)
+            conn_final_flags_dict[key] = 'RSTOS0'
+        elif all(x in conn.a_flags for x in ['S','AF']) and ('AS' not in conn.b_flags):
+            # originator sent SYN followed by FIN, we never saw SYN-ACK from responder (connection was half open) -> est. flag SYN + FIN (from client)
+            conn_final_flags_dict[key] = 'SH'
         else:
             conn_final_flags_dict[key] = 'without flag'
 
     print("conn_final_flags_dict size - ", len(conn_final_flags_dict))
-    with open('analyze_flags.txt',mode='w') as f:
+    with open('analyze_flags1.txt',mode='w') as f:
         for k, v in conn_final_flags_dict.items():
             f.write(str(k) + ' >>> ' + str(v) + '\n')
 
