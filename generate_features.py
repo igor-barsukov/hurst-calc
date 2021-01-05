@@ -17,6 +17,8 @@ class Connection:
         self.b_bytes = 0
         self.a_flags = []
         self.b_flags = []
+        self.final_flag = ''
+        self.dst_host_count = 0
 
 
     def setABytes(self, bytes):
@@ -31,9 +33,16 @@ class Connection:
     def setBFlags(self, packet_flags):
         self.b_flags.append(packet_flags)
 
+    def setFinalFlag(self, flag):
+        self.final_flag = flag
+
+    def setDstHostCount(self, counter):
+        self.dst_host_count = counter
+
     def __str__(self):
         return (f'Connection: A host - {self.a_addr}:{self.a_port} with {self.a_bytes} bytes - flags: {self.a_flags},\n'
-                            f'B host - {self.b_addr}:{self.b_port} with {self.b_bytes} bytes - flags: {self.b_flags}')
+                            f'B host - {self.b_addr}:{self.b_port} with {self.b_bytes} bytes - flags: {self.b_flags},\n'
+                            f'final flag = {self.final_flag} and dst_host_count = {self.dst_host_count}')
      
 
 '''
@@ -312,51 +321,69 @@ def get_flags1(pcap):
     # with open('get_flags1.txt',mode='w') as f:
     #     for k, v in conn_flags_dict.items():
     #         f.write(str(v) + '\n')
-    analyze_flags(conn_flags_dict)
+    return analyze_flags(conn_flags_dict)
 
 def analyze_flags(conn_flags_dict):
-    conn_final_flags_dict = {}
+    conn_final_flags_dict = {} # ToDo remove that dict
     for key, conn in conn_flags_dict.items():
         if all(x in conn.a_flags for x in ['S','A','AF']) and all(x in conn.b_flags for x in ['AS','A','AF']):
             # normal establishment and termination -> all est. flags (SYN, SYN-ACK, ACK) + all term. flags (FIN, FIN-ACK, ACK)
-            conn_final_flags_dict[key] = 'SF'
+            conn_final_flags_dict[key] = 'SF'            
+            conn.setFinalFlag('SF')
         elif (len(conn.a_flags) == 2) and (len(conn.b_flags) == 1) and (conn.a_flags[0] == 'S') and (conn.b_flags[0] == 'AS') and (conn.a_flags[1] == 'R'):
             # connection attempt rejected -> est. flags SYN, SYN-ACK + RST (from client)
             conn_final_flags_dict[key] = 'REJ'
+            conn.setFinalFlag('REJ')
         elif ('S' in conn.a_flags) and (len(conn.a_flags) == 1) and ('AS' not in conn.b_flags):
             # connection attempt seen, no reply -> SYN only
             conn_final_flags_dict[key] = 'S0'
+            conn.setFinalFlag('S0')
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and all(x not in conn.a_flags for x in ['F','AF','R','AR']) and all(x not in conn.b_flags for x in ['F','AF','R','AR']):
             # connection established, not terminated -> all est. flags (SYN, SYN-ACK, ACK) 
             conn_final_flags_dict[key] = 'S1'
+            conn.setFinalFlag('S1')
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('AF' in conn.a_flags) and ('AF' not in conn.b_flags):
             # connection established and close attempt by originator seen (but no reply from responder) -> all est. flags (SYN, SYN-ACK, ACK) + FIN from originator
             conn_final_flags_dict[key] = 'S2'
+            conn.setFinalFlag('S2')
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('AF' not in conn.a_flags) and ('AF' in conn.b_flags):
             # connection established and close attempt by responder seen (but no reply from originator) -> all est. flags (SYN, SYN-ACK, ACK) + FIN from responder
             conn_final_flags_dict[key] = 'S3'
+            conn.setFinalFlag('S3')
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('R' in conn.a_flags) and ('R' not in conn.b_flags):
             # connection reset by originator -> all est. flags (SYN, SYN-ACK, ACK) + RST from originator
             conn_final_flags_dict[key] = 'RSTO' # possibly wrong conditions
+            conn.setFinalFlag('RSTO')
         elif all(x in conn.a_flags for x in ['S','A']) and ('AS' in conn.b_flags) and ('R' not in conn.a_flags) and ('R' in conn.b_flags):
             # connection reset by responder -> all est. flags (SYN, SYN-ACK, ACK) + RST from responder
             conn_final_flags_dict[key] = 'RSTR' # possibly wrong conditions
+            conn.setFinalFlag('RSTR')
         elif all(x not in conn.a_flags for x in ['S','AF']) and all(x not in conn.b_flags for x in ['AS','AF']):
             # no SYN seen, just midstream traffic (partial connection that was not later closed) -> no est. related flags + no term. related flags
             conn_final_flags_dict[key] = 'OTH'
+            conn.setFinalFlag('OTH')
         elif all(x in conn.a_flags for x in ['S','R']) and (len(conn.a_flags) == 2) and ('AS' not in conn.b_flags):
             # originator sent SYN followed by RST, we never saw SYN-ACK from responder -> est. flag SYN + RST (from client)
             conn_final_flags_dict[key] = 'RSTOS0'
+            conn.setFinalFlag('RSTOS0')
         elif all(x in conn.a_flags for x in ['S','AF']) and ('AS' not in conn.b_flags):
             # originator sent SYN followed by FIN, we never saw SYN-ACK from responder (connection was half open) -> est. flag SYN + FIN (from client)
             conn_final_flags_dict[key] = 'SH'
+            conn.setFinalFlag('SH')
         else:
             conn_final_flags_dict[key] = 'without flag'
+            conn.setFinalFlag('without flag')
 
-    print("conn_final_flags_dict size - ", len(conn_final_flags_dict))
-    with open('analyze_flags1.txt',mode='w') as f:
-        for k, v in conn_final_flags_dict.items():
-            f.write(str(k) + ' >>> ' + str(v) + '\n')
+    # print("conn_final_flags_dict size - ", len(conn_final_flags_dict))
+    # with open('analyze_flags1.txt',mode='w') as f:
+    #     for k, v in conn_final_flags_dict.items():
+    #         f.write(str(k) + ' >>> ' + str(v) + '\n')
+
+    # with open('analyze_flags2.txt',mode='w') as f:
+    #     for k, v in conn_flags_dict.items():
+    #         f.write(str(v) + '\n')
+
+    return conn_flags_dict
 
 
 def get_urgents(pcap):
@@ -440,11 +467,93 @@ def get_src_bytes2(pcap):
     print('conn_bytes_dict size - ', len(conn_bytes_dict))
     with open('get_src_bytes2.txt',mode='w') as f:
         for k, v in conn_bytes_dict.items():
-            f.write(str(v) + '\n')
+            f.write(str(k) + '>>>' + str(v) + '\n')
 
 
 def get_dst_bytes(pcap):
     print('get_dst_bytes')
+
+def get_dst_host_count(pcap):
+    print('get_dst_host_count')
+    conn_dict = {}
+    dst_host_count_dict = {}
+    for ts, buf in pcap:
+        eth = dpkt.ethernet.Ethernet(buf)
+        tcp_response = detect_tcp(eth)
+        if(tcp_response is not None):
+            conn = generate_tcp_connection_obj(tcp_response)
+            if (conn.key not in conn_dict) and (conn.reversed_key not in conn_dict):
+                conn_dict[conn.key] = conn
+                if (conn.b_addr not in dst_host_count_dict):
+                    dst_host_count_dict[conn.b_addr] = 1
+                else: 
+                    count = dst_host_count_dict[conn.b_addr]
+                    count += 1
+                    dst_host_count_dict[conn.b_addr] = count
+
+    # need to define the way how to store that char - inside connection obj or smth else
+
+    # for key, conn in conn_dict.items():
+    #     for dst_host, count in dst_host_count_dict.items():
+    #         if (conn.b_addr == dst_host):
+
+    # print('conn_dict size - ', len(conn_dict))
+    # with open('get_dst_host_count.txt',mode='w') as f:
+    #     for k, v in conn_dict.items():
+    #         f.write(str(k) + '>>>' + str(v) + '\n')
+    print('dst_host_count_dict size - ', len(dst_host_count_dict)) 
+    with open('dst_host_count_dict.txt',mode='w') as f:
+        for k, v in dst_host_count_dict.items():
+            f.write(str(k) + '>>>' + str(v) + '\n')
+
+def get_dst_host_count_v2(conn_dict):
+    dst_host_count_dict = {}
+    for key, conn in conn_dict.items():
+        if (conn.b_addr not in dst_host_count_dict):
+            dst_host_count_dict[conn.b_addr] = 1
+        else:
+            count = dst_host_count_dict[conn.b_addr]
+            count += 1          
+            dst_host_count_dict[conn.b_addr] = count
+    # how to implement without doulble loop?
+    for key, conn in conn_dict.items():
+        for b_addr, counter in  dst_host_count_dict.items():
+            if (conn.b_addr == b_addr):
+                conn.setDstHostCount(counter)
+
+    print('get_dst_host_count_v2 conn_dict size - ', len(dst_host_count_dict)) 
+    # with open('dst_host_count_dict_v2.txt',mode='w') as f:
+    #     for k, v in conn_dict.items():
+    #         f.write(str(v) + '\n')
+    return conn_dict
+
+# possible solution - put here calc of Dst Host Rerror Rate as well
+def get_dst_host_serror_rate(conn_dict):
+    print('get_dst_host_serror_rate')
+    # get all connections with same Dst Host Count, get num of connections with flags s0-s3 among them, calc % of all number of connections in that group
+    # new dict with : dst_host_ip - num_of_s0_s3_conn - all_num_of_conn_with_that_ip
+    # iterate over conn_dict and fill that dict  
+    dst_host_serror_rate_dict = {}  # key - conn b_addr, val - list of [num_of_s0_s3_conn,dst_host_count]
+    for key, conn in conn_dict.items():
+        if (conn.final_flag == 'S0') or (conn.final_flag == 'S1') or (conn.final_flag == 'S2') or (conn.final_flag == 'S3'):
+            dst_host_key = conn.b_addr
+            if (dst_host_key not in dst_host_serror_rate_dict):
+                dst_host_serror_rate_dict[dst_host_key] = [1,conn.dst_host_count]
+            else:
+                count = dst_host_serror_rate_dict[dst_host_key][0]
+                count += 1
+                dst_host_serror_rate_dict[dst_host_key][0] = count
+    for key, val in dst_host_serror_rate_dict.items():
+        serror_rate = (val[0] / val[1]) * 100
+        val.append(serror_rate)
+    print('get_dst_host_serror_rate size - ', len(dst_host_serror_rate_dict)) 
+    with open('dst_host_serror_rate_dict.txt',mode='w') as f:
+        for k, v in dst_host_serror_rate_dict.items():
+            f.write(str(v) + '\n')
+
+
+def get_dst_host_srv_count(conn_dict):
+    pass
 
 
 def main():
@@ -454,7 +563,9 @@ def main():
     # get_flags(pcap)
     # get_urgents(pcap)
     # get_src_bytes2(pcap)
-    get_flags1(pcap)
+    conn_dict = get_flags1(pcap)
+    conn_dict1 = get_dst_host_count_v2(conn_dict)
+    get_dst_host_serror_rate(conn_dict1)
 
 if __name__ == '__main__':
     main()
