@@ -64,17 +64,17 @@ class Duration:
     def __init__(self, first_packet_ts):
         self.first_packet_ts = first_packet_ts
         self.last_packet_ts = 0.0
-        self.duration_ts = 0.0
+        self.duration_ts = 0 # should be integer
 
     def resetLastTs(self, last_packet_ts):
         self.last_packet_ts = last_packet_ts
 
     def calcDurationTs(self):
         if (self.last_packet_ts > 0.0):
-            self.duration_ts = self.last_packet_ts - self.first_packet_ts
+            self.duration_ts = int(round(self.last_packet_ts - self.first_packet_ts))
 
     def __str__(self):
-        return (f'Duration object: fisrt_ts = {self.first_packet_ts}, last_ts = {self.last_packet_ts}, duration = {self.duration_ts}')
+        return (f'Duration object: fisrt_ts = {self.first_packet_ts}, last_ts = {self.last_packet_ts}, duration int = {self.duration_ts}')
 
 '''
 Helper methods
@@ -492,14 +492,7 @@ def get_dst_host_serror_rerror_rate(conn_dict, print_for_debug = False):
     for key, conn in conn_dict.items():
         if (conn.final_flag == 'S0') or (conn.final_flag == 'S1') or (conn.final_flag == 'S2') or (conn.final_flag == 'S3'):
             dst_host_key = conn.b_addr + '_' + 'S'
-            if (dst_host_key not in dst_host_error_rate_dict):
-                dst_host_error_rate_dict[dst_host_key] = [1,conn.dst_host_count]
-            else:
-                count = dst_host_error_rate_dict[dst_host_key][0]
-                count += 1
-                dst_host_error_rate_dict[dst_host_key][0] = count
-        elif (conn.final_flag == 'REJ'):
-            dst_host_key = conn.b_addr + '_' + 'REJ'
+            dst_host_srv_key = str(conn.b_port) + '_' + 'S'
             if (dst_host_key not in dst_host_error_rate_dict):
                 dst_host_error_rate_dict[dst_host_key] = [1,conn.dst_host_count]
             else:
@@ -507,45 +500,82 @@ def get_dst_host_serror_rerror_rate(conn_dict, print_for_debug = False):
                 count += 1
                 dst_host_error_rate_dict[dst_host_key][0] = count
 
+            if (dst_host_srv_key not in dst_host_error_rate_dict):
+                dst_host_error_rate_dict[dst_host_srv_key] = [1,conn.dst_host_srv_count]
+            else:
+                count = dst_host_error_rate_dict[dst_host_srv_key][0]
+                count += 1
+                dst_host_error_rate_dict[dst_host_srv_key][0] = count
+        elif (conn.final_flag == 'REJ'):
+            dst_host_key = conn.b_addr + '_' + 'REJ'
+            dst_host_srv_key = str(conn.b_port) + '_' + 'REJ'
+            if (dst_host_key not in dst_host_error_rate_dict):
+                dst_host_error_rate_dict[dst_host_key] = [1,conn.dst_host_count]
+            else:
+                count = dst_host_error_rate_dict[dst_host_key][0]
+                count += 1
+                dst_host_error_rate_dict[dst_host_key][0] = count
+
+            if (dst_host_srv_key not in dst_host_error_rate_dict):
+                dst_host_error_rate_dict[dst_host_srv_key] = [1,conn.dst_host_srv_count]
+            else:
+                count = dst_host_error_rate_dict[dst_host_srv_key][0]
+                count += 1
+                dst_host_error_rate_dict[dst_host_srv_key][0] = count
+
     dst_host_serror_rate_list = []
     dst_host_rerror_rate_list = []
+    dst_host_srv_serror_rate_list = []
+    dst_host_srv_rerror_rate_list = []
 
     for key, conn in conn_dict.items():
         if (conn.final_flag == 'S0') or (conn.final_flag == 'S1') or (conn.final_flag == 'S2') or (conn.final_flag == 'S3'):
             dst_host_key = conn.b_addr + '_' + 'S'
-            dst_host_conn_key = key + '_' + 'S'
+            dst_host_srv_key = str(conn.b_port) + '_' + 'S'
 
-            flagged_conn_count = dst_host_error_rate_dict[dst_host_key][0]
+            flagged_serror_conn_count = dst_host_error_rate_dict[dst_host_key][0]
             dst_host_count = dst_host_error_rate_dict[dst_host_key][1]
-            serror_rate = (flagged_conn_count / dst_host_count) * 100
+            serror_rate = round((flagged_serror_conn_count / dst_host_count), 2)
+
+            flagged_srv_serror_conn_count = dst_host_error_rate_dict[dst_host_srv_key][0]
+            dst_host_srv_count = dst_host_error_rate_dict[dst_host_srv_key][1]
+            srv_serror_rate = round((flagged_srv_serror_conn_count / dst_host_srv_count), 2)           
 
             dst_host_serror_rate_list.append(serror_rate)
+            dst_host_srv_serror_rate_list.append(srv_serror_rate)
         else:
-            dst_host_conn_key = key + '_' + 'S'
             dst_host_serror_rate_list.append(0)
+            dst_host_srv_serror_rate_list.append(0)
 
         if (conn.final_flag == 'REJ'):
             dst_host_key = conn.b_addr + '_' + 'REJ'
-            dst_host_conn_key = key + '_' + 'REJ'
+            dst_host_srv_key = str(conn.b_port) + '_' + 'REJ'
 
-            flagged_conn_count = dst_host_error_rate_dict[dst_host_key][0]
+            flagged_rerror_conn_count = dst_host_error_rate_dict[dst_host_key][0]
             dst_host_count = dst_host_error_rate_dict[dst_host_key][1]
-            rerror_rate = (flagged_conn_count / dst_host_count) * 100
+            rerror_rate = round((flagged_rerror_conn_count / dst_host_count), 2)
+
+            flagged_srv_rerror_conn_count = dst_host_error_rate_dict[dst_host_srv_key][0]
+            dst_host_srv_count = dst_host_error_rate_dict[dst_host_srv_key][1]
+            srv_rerror_rate = round((flagged_srv_rerror_conn_count / dst_host_srv_count), 2)    
 
             dst_host_rerror_rate_list.append(rerror_rate)
+            dst_host_srv_rerror_rate_list.append(srv_rerror_rate)
         else:
-            dst_host_conn_key = key + '_' + 'REJ'
             dst_host_rerror_rate_list.append(0)
+            dst_host_srv_rerror_rate_list.append(0)
     
     print('dst_host_error_rate_dict size - ', len(dst_host_error_rate_dict))    
 
     print(f'dst_host_serror_rate_list size - {len(dst_host_serror_rate_list)},\n'
-          f'dst_host_rerror_rate_list size - {len(dst_host_rerror_rate_list)}')
+          f'dst_host_rerror_rate_list size - {len(dst_host_rerror_rate_list)},\n'
+          f'dst_host_srv_serror_rate_list size - {len(dst_host_srv_serror_rate_list)},\n'
+          f'dst_host_srv_rerror_rate_list size - {len(dst_host_srv_rerror_rate_list)}')
     if print_for_debug:
         with open('dst_host_error_rate_dict.txt',mode='w') as f:
             for k, v in dst_host_error_rate_dict.items():
-                f.write(str(v) + '\n')
-    return dst_host_serror_rate_list, dst_host_rerror_rate_list
+                f.write(str(k) + '_' + str(v) + '\n')
+    return dst_host_serror_rate_list, dst_host_rerror_rate_list, dst_host_srv_serror_rate_list, dst_host_srv_rerror_rate_list  
 
 def get_dst_host_srv_count(conn_dict):
     pass
@@ -657,6 +687,11 @@ def analyze_flags_for_conn(conn):
     else:
         conn.setFinalFlag('without flag')
 
+# returns numeric representation of flag
+def get_int_flag(str_flag):
+    map_str_to_int_flag_dict = {'OTH':1,'REJ':2,'RSTO':3,'RSTOS0':4,'RSTR':5,'S0':6,'S1':7,'S2':8,'S3':9,'SF':10,'SH':11,'without flag':12}
+    return map_str_to_int_flag_dict[str_flag]
+
 def get_src_dst_bytes_for_conn(buf, conn, conn_bytes_dict):
     if (conn.key in conn_bytes_dict):
         stored_conn = conn_bytes_dict[conn.key]
@@ -687,7 +722,7 @@ def identify_connections(pcap, print_for_debug = False):
     print("conn_dict size - ", len(conn_dict))
     
     # looks ugly, refactor - possible move it in for loop above
-    conn_dict = get_dst_host_count_v2(conn_dict, True)
+    conn_dict = get_dst_host_count_v2(conn_dict)
 
     keys_list = [] # for debug purpose
     duration_list = []
@@ -705,7 +740,7 @@ def identify_connections(pcap, print_for_debug = False):
         duration_list.append(conn.duration.duration_ts)
         # calc and set flag
         analyze_flags_for_conn(conn)
-        flags_list.append(conn.final_flag)
+        flags_list.append(get_int_flag(conn.final_flag))
         # set src-dst bytes
         src_bytes_list.append(conn.a_bytes)          
         dst_bytes_list.append(conn.b_bytes)
@@ -717,8 +752,12 @@ def identify_connections(pcap, print_for_debug = False):
         dst_host_srv_count_list.append(conn.dst_host_srv_count)
 
     # secondary characteristics (dependent)
-    dst_host_serror_rate_list, dst_host_rerror_rate_list = get_dst_host_serror_rerror_rate(conn_dict)
+    dst_host_serror_rate_list, dst_host_rerror_rate_list, dst_host_srv_serror_rate_list, dst_host_srv_rerror_rate_list = get_dst_host_serror_rerror_rate(conn_dict, True)
 
+    if print_for_debug:
+        with open('identify_connections_dict.txt',mode='w') as f:
+            for k, v in conn_dict.items():
+                f.write(str(k) + '_' + str(v) + '\n')
 
     print(f'duration_list size - {len(duration_list)}')
     print(f'flags_list size - {len(flags_list)}')
@@ -730,7 +769,8 @@ def identify_connections(pcap, print_for_debug = False):
     # print(f'urgents_list size - {len(urgents_list)}, type - {type(urgents_list)}')
 
     return zip(keys_list, duration_list, urgents_list, flags_list, src_bytes_list, dst_bytes_list, dst_host_count_list, 
-        dst_host_srv_count_list, dst_host_serror_rate_list, dst_host_rerror_rate_list)
+        dst_host_srv_count_list, dst_host_serror_rate_list, dst_host_rerror_rate_list, dst_host_srv_serror_rate_list, 
+        dst_host_srv_rerror_rate_list)
 
 def generate_final_csv(rows):
     print('generate_final_csv')
@@ -758,7 +798,7 @@ def main():
     # list1, list2, list3 = identify_connections(pcap)
     # generate_final_csv(list1, list2, list3) 
 
-    generate_final_csv(identify_connections(pcap)) # ToDo не вставляется как нужно 
+    generate_final_csv(identify_connections(pcap, True))
  
 if __name__ == '__main__':
     main()
