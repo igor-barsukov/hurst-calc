@@ -447,6 +447,13 @@ def get_dst_host_count(pcap):
         for k, v in dst_host_count_dict.items():
             f.write(str(k) + '>>>' + str(v) + '\n')
 
+'''
+Refactored logic
+Reducing execution time
+
+'''
+######################################################## 
+
 def get_dst_host_count_v2(conn_dict, print_for_debug = False):
     dst_host_count_dict = {}
     dst_host_srv_count_dict = {}
@@ -481,6 +488,14 @@ def get_dst_host_count_v2(conn_dict, print_for_debug = False):
             for k, v in conn_dict.items():
                 f.write(str(v) + '\n')
     return conn_dict
+
+def get_count_srv_count(conn_dict, print_for_debug = False):
+    print("get_count_srv_count")
+    for key, conn in conn_dict.items():
+        dest_ip = conn.b_addr
+        # проверяем по объекту duration внутри conn 
+        # для текущ соединения берем 
+
 
 # put here dst host srv serror rerror rate
 def get_dst_host_serror_rerror_rate(conn_dict, print_for_debug = False):
@@ -575,18 +590,8 @@ def get_dst_host_serror_rerror_rate(conn_dict, print_for_debug = False):
         with open('dst_host_error_rate_dict.txt',mode='w') as f:
             for k, v in dst_host_error_rate_dict.items():
                 f.write(str(k) + '_' + str(v) + '\n')
-    return dst_host_serror_rate_list, dst_host_rerror_rate_list, dst_host_srv_serror_rate_list, dst_host_srv_rerror_rate_list  
+    return dst_host_serror_rate_list, dst_host_rerror_rate_list, dst_host_srv_serror_rate_list, dst_host_srv_rerror_rate_list
 
-def get_dst_host_srv_count(conn_dict):
-    pass
-
-
-'''
-Refactored logic
-Reducing execution time
-
-'''
-######################################################## 
 
 def get_duration_for_conn(ts, conn, conn_durations_dict):
     if (conn.key in conn_durations_dict):
@@ -688,6 +693,7 @@ def analyze_flags_for_conn(conn):
         conn.setFinalFlag('without flag')
 
 # returns numeric representation of flag
+# order based on https://github.com/jmnwong/NSL-KDD-Dataset/blob/master/KDDTest%2B.arff
 def get_int_flag(str_flag):
     map_str_to_int_flag_dict = {'OTH':1,'REJ':2,'RSTO':3,'RSTOS0':4,'RSTR':5,'S0':6,'S1':7,'S2':8,'S3':9,'SF':10,'SH':11,'without flag':12}
     return map_str_to_int_flag_dict[str_flag]
@@ -768,15 +774,15 @@ def identify_connections(pcap, print_for_debug = False):
     # urgents_list = [conn.urgents for conn in conn_dict.values()]
     # print(f'urgents_list size - {len(urgents_list)}, type - {type(urgents_list)}')
 
-    return zip(keys_list, duration_list, urgents_list, flags_list, src_bytes_list, dst_bytes_list, dst_host_count_list, 
-        dst_host_srv_count_list, dst_host_serror_rate_list, dst_host_rerror_rate_list, dst_host_srv_serror_rate_list, 
-        dst_host_srv_rerror_rate_list)
+    return zip(duration_list, src_bytes_list, dst_bytes_list, urgents_list, dst_host_count_list, dst_host_srv_count_list, 
+               dst_host_serror_rate_list, dst_host_srv_serror_rate_list, dst_host_rerror_rate_list, 
+               dst_host_srv_rerror_rate_list, flags_list)
 
 def generate_final_csv(rows):
     print('generate_final_csv')
     # print(Lists)
     # rows = zip(*Lists)
-    with open('final_csv1.csv', "w") as f:
+    with open('test_data.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         for row in rows:
             writer.writerow(row)
