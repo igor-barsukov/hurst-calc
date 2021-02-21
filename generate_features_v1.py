@@ -1,9 +1,14 @@
 import dpkt
 import socket
 import csv
+import sys
+import getopt
+import os
 
-# infile = open('D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap', 'rb')
-infile = open('C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\2020-11-16-22-11.pcap\\testfile.2020-11-16.%H.%M.%S.pcap', 'rb')
+## linux notation
+# globalFilePath = 'D:/Aspirantura/traffic/moodle_2020/testfile.2020-06-07.%H.%M.%S.pcap'
+## Windows notation
+globalFilePath = 'C:\\Users\\igba0714\\Documents\\Studying\\Postgrade\\moodle_2020\\2020-11-16-22-11.pcap\\testfile.2020-11-16.%H.%M.%S.pcap'
 
 class Connection:
     
@@ -778,16 +783,39 @@ def identify_connections(pcap, print_for_debug = False):
                dst_host_serror_rate_list, dst_host_srv_serror_rate_list, dst_host_rerror_rate_list, 
                dst_host_srv_rerror_rate_list, flags_list)
 
-def generate_final_csv(rows):
+def generate_final_csv(rows, fileName):
     print('generate_final_csv')
     # print(Lists)
     # rows = zip(*Lists)
-    with open('test_data.csv', 'w', newline='') as f:
+    with open(fileName + '_chars.csv', 'w', newline='') as f:
         writer = csv.writer(f)
         for row in rows:
             writer.writerow(row)
 
-def main():
+def get_file_name_from_path(filePath):
+    fileNameBase = os.path.basename(filePath)
+    fileName = os.path.splitext(fileNameBase)[0] # to fetch name without extension
+    print(f"fileName - {fileName}")
+    return fileName
+
+def main(argv):
+    print("argv - ", argv)
+    opts, args = getopt.getopt(argv, "hf:", ["help", "filePath="])
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            print("Usage: python <script_name> -f <full path to pcap file which need to be processsed>.\n" 
+                  "If -f not set, then using global var globalFilePath.")
+            sys.exit()
+        elif opt in ("-f", "--filePath"):
+            filePath = arg
+            infile = open(filePath, 'rb')
+            fileName = get_file_name_from_path(filePath)
+    
+    if not argv:
+        print("No args were transmited, using globalFilePath")
+        infile = open(globalFilePath, 'rb')
+        fileName = get_file_name_from_path(globalFilePath)
+
     pcap = dpkt.pcap.Reader(infile)
     # duration_list = get_duration(pcap, True)
     # duration_list = get_duration_conn_obj(pcap, True)
@@ -804,7 +832,7 @@ def main():
     # list1, list2, list3 = identify_connections(pcap)
     # generate_final_csv(list1, list2, list3) 
 
-    generate_final_csv(identify_connections(pcap, True))
+    generate_final_csv(identify_connections(pcap, True), fileName)
  
 if __name__ == '__main__':
-    main()
+    main(sys.argv[1:])
