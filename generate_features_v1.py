@@ -716,7 +716,7 @@ def get_src_dst_bytes_for_conn(buf, conn, conn_bytes_dict):
         conn.setABytes(len(buf))
         conn_bytes_dict[conn.key] = conn
 
-def identify_connections(pcap, print_for_debug = False):
+def identify_connections(pcap, attack_label, print_for_debug = False):
     print('identify_connections')
     conn_dict = {}
     for ts, buf in pcap:
@@ -779,6 +779,16 @@ def identify_connections(pcap, print_for_debug = False):
     # urgents_list = [conn.urgents for conn in conn_dict.values()]
     # print(f'urgents_list size - {len(urgents_list)}, type - {type(urgents_list)}')
 
+    if attack_label:
+        # Setting attack label. Needed for further processing by neural network.
+        if (attack_label == '0') or (attack_label == 'False'):
+            attack_labels_list = [0] * len(conn_dict)
+        elif (attack_label == '1') or (attack_label == 'True'):
+            attack_labels_list = [1] * len(conn_dict)
+        return zip(duration_list, src_bytes_list, dst_bytes_list, urgents_list, dst_host_count_list, dst_host_srv_count_list, 
+               dst_host_serror_rate_list, dst_host_srv_serror_rate_list, dst_host_rerror_rate_list, 
+               dst_host_srv_rerror_rate_list, flags_list, attack_labels_list)        
+
     return zip(duration_list, src_bytes_list, dst_bytes_list, urgents_list, dst_host_count_list, dst_host_srv_count_list, 
                dst_host_serror_rate_list, dst_host_srv_serror_rate_list, dst_host_rerror_rate_list, 
                dst_host_srv_rerror_rate_list, flags_list)
@@ -800,16 +810,27 @@ def get_file_name_from_path(filePath):
 
 def main(argv):
     print("argv - ", argv)
-    opts, args = getopt.getopt(argv, "hf:", ["help", "filePath="])
+    opts, args = getopt.getopt(argv, "hf:a:", ["help", "filePath=", "attack="])
+    attackLabel = ""
     for opt, arg in opts:
         if opt in ("-h", "--help"):
-            print("Usage: python <script_name> -f <full path to pcap file which need to be processsed>.\n" 
-                  "If -f not set, then using global var globalFilePath.")
+            print("Usage: python [script_name] -f [file path] -a [set attack label]\n"
+                  "-f, --filePath     full path to pcap file which need to be processsed. If -f not set, \n" 
+                  "                   then using global var globalFilePath. \n"
+                  "-a, --attackLabel  setting attack label. Possible values: 0 (False) - normal traffic, \n"
+                  "                   1 (True) - attack traffic")
             sys.exit()
         elif opt in ("-f", "--filePath"):
             filePath = arg
             infile = open(filePath, 'rb')
             fileName = get_file_name_from_path(filePath)
+        elif opt in ("-a", "--attackLabel"):
+            attackLabel = arg
+            print(f"attackLabel - {attackLabel}, type - {type(attackLabel)}")
+            if attackLabel not in ("0", "1", "True", "False"):
+                print("Unrecognized attack label")
+                attackLabel = ""
+
     
     if not argv:
         print("No args were transmited, using globalFilePath")
@@ -832,7 +853,7 @@ def main(argv):
     # list1, list2, list3 = identify_connections(pcap)
     # generate_final_csv(list1, list2, list3) 
 
-    generate_final_csv(identify_connections(pcap, True), fileName)
+    generate_final_csv(identify_connections(pcap, attackLabel, True), fileName)
  
 if __name__ == '__main__':
     main(sys.argv[1:])
